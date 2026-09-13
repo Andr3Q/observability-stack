@@ -1,0 +1,35 @@
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+discovery.relabel "journal" {
+  targets = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.source.journal "journal" {
+  path          = "/var/log/journal"
+  max_age       = "24h0m0s"
+  relabel_rules = discovery.relabel.journal.rules
+  forward_to    = [loki.relabel.fix_job.receiver]
+}
+
+loki.relabel "fix_job" {
+  forward_to = [loki.write.default.receiver]
+
+  rule {
+    target_label = "job"
+    replacement  = "systemd-journal"
+  }
+}
